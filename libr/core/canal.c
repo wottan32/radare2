@@ -669,13 +669,14 @@ static int r_anal_analyze_fcn_refs(RCore *core, RAnalFunction *fcn, int depth) {
 		}
 		switch (ref->type) {
 		case R_ANAL_REF_TYPE_DATA:
+		case R_ANAL_REF_TYPE_READ:
 			if (core->anal->opt.followdatarefs) {
 				r_anal_try_get_fcn (core, ref, depth, 2);
 			}
 			break;
 		case R_ANAL_REF_TYPE_CODE:
 		case R_ANAL_REF_TYPE_CALL:
-			r_core_anal_fcn (core, ref->addr, ref->at, ref->type, depth-1);
+			r_core_anal_fcn (core, ref->addr, ref->at, ref->type, depth - 1);
 			break;
 		default:
 			break;
@@ -2998,6 +2999,12 @@ static int fcn_print_detail(RCore *core, RAnalFunction *fcn) {
 		case R_ANAL_REF_TYPE_DATA:
 			r_cons_printf ("axd 0x%"PFMT64x" 0x%"PFMT64x"\n", refi->addr, refi->at);
 			break;
+		case R_ANAL_REF_TYPE_READ:
+			r_cons_printf ("axr 0x%"PFMT64x" 0x%"PFMT64x"\n", refi->addr, refi->at);
+			break;
+		case R_ANAL_REF_TYPE_WRTE:
+			r_cons_printf ("axw 0x%"PFMT64x" 0x%"PFMT64x"\n", refi->addr, refi->at);
+			break;
 		case R_ANAL_REF_TYPE_CODE:
 			r_cons_printf ("axc 0x%"PFMT64x" 0x%"PFMT64x"\n", refi->addr, refi->at);
 			break;
@@ -3048,7 +3055,7 @@ static int fcn_print_legacy(RCore *core, RAnalFunction *fcn) {
 	if (fcn->cc) {
 		r_cons_printf ("\ncall-convention: %s", fcn->cc);
 	}
-	r_cons_printf ("\ncyclomatic-cost : %d", r_anal_function_cost (fcn));
+	r_cons_printf ("\ncyclomatic-cost: %d", r_anal_function_cost (fcn));
 	r_cons_printf ("\ncyclomatic-complexity: %d", r_anal_function_complexity (fcn));
 	r_cons_printf ("\nbits: %d", fcn->bits);
 	r_cons_printf ("\ntype: %s", r_anal_fcntype_tostring (fcn->type));
@@ -3074,6 +3081,7 @@ static int fcn_print_legacy(RCore *core, RAnalFunction *fcn) {
 	}
 	r_cons_printf ("\ndata-refs:");
 	r_list_foreach (refs, iter, refi) {
+		// global or local?
 		if (refi->type == R_ANAL_REF_TYPE_DATA) {
 			r_cons_printf (" 0x%08"PFMT64x, refi->addr);
 		}

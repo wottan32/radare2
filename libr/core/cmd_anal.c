@@ -716,6 +716,7 @@ static const char *help_msg_ax[] = {
 	"axm", " addr [at]", "copy data/code references pointing to addr to also point to curseek (or at)",
 	"axt", " [addr]", "find data/code references to this address",
 	"axf", " [addr]", "find data/code references from this address",
+	"axv", " [addr]", "list local variables read-write-exec references",
 	"ax.", " [addr]", "find data/code references from and to this address",
 	"axff[j]", " [addr]", "find data/code references from this function",
 	"axs", " addr [at]", "add string ref",
@@ -969,6 +970,15 @@ static void var_help(RCore *core, char ch) {
 	}
 }
 
+static RList *var_accesses_list2(RAnal *a, RAnalFunction *fcn, int delta, const char *typestr) {
+	const char *var_local = sdb_fmt ("var.0x%"PFMT64x".%d.%d.%s", fcn->addr, 1, delta, typestr);
+	char *xss = sdb_get (a->sdb_fcns, var_local, 0);
+	if (xss && *xss) {
+		return r_str_split_list (xss, ",", 0);
+	}
+	return NULL;
+}
+
 static void var_accesses_list(RAnal *a, RAnalFunction *fcn, int delta, const char *typestr) {
 	const char *var_local = sdb_fmt ("var.0x%"PFMT64x".%d.%d.%s",
 			fcn->addr, 1, delta, typestr);
@@ -977,6 +987,43 @@ static void var_accesses_list(RAnal *a, RAnalFunction *fcn, int delta, const cha
 		r_cons_printf ("%s\n", xss);
 	} else {
 		r_cons_newline ();
+	}
+}
+
+static void list_vars2(RCore *core, RAnalFunction *fcn, int type) {
+	RAnalVar *var;
+	RListIter *iter;
+
+	if (type == '*') {
+		RList *list = r_anal_var_all_list (core->anal, fcn);
+		const char *bp = r_reg_get_name (core->anal->reg, R_REG_NAME_BP);
+		r_cons_printf ("f-fcnvar*\n");
+		r_list_foreach (list, iter, var) {
+			r_cons_printf ("f fcnvar.%s @ %s%s%d\n", var->name, bp,
+				var->delta>=0? "+":"", var->delta);
+		}
+		return;
+	}
+	RList *list = r_anal_var_all_list (core->anal, fcn);
+	r_list_foreach (list, iter, var) {
+		r_cons_printf ("%10s  ", var->name);
+		const char *n;
+		RList *l = var_accesses_list2 (core->anal, fcn, var->delta, "reads");
+		r_list_foreach (l, iter, n) {
+			eprintf ("pid 1 @ %s\n", n);
+			eprintf ("pre\n");
+			r_core_cmdf (core, "pid 1 @ %s", n);
+			eprintf ("pos\n");
+		}
+r_cons_printf("%d\n", r_list_length (l));
+continue;
+		r_list_free (l);
+		l = var_accesses_list2 (core->anal, fcn, var->delta, "writes");
+		r_list_foreach (l, iter, n) {
+			eprintf ("pid 1 @ %s\n", n);
+			r_core_cmdf (core, "pid 1 @ %s", n);
+		}
+		r_list_free (l);
 	}
 }
 
@@ -1206,6 +1253,9 @@ static int var_cmd(RCore *core, const char *str) {
 			eprintf ("afv: Cannot find function in 0x%08"PFMT64x"\n", core->offset);
 			return false;
 		}
+	case '=': // "afv="
+		list_vars2 (core, fcn, 0);
+		break;
 	case 'a': // "afva"
 		if (fcn) {
 			r_anal_var_delete_all (core->anal, fcn->addr, R_ANAL_VAR_KIND_REG);
@@ -3785,8 +3835,19 @@ static int cmd_anal_fcn(RCore *core, const char *input) {
 							pj_kn (pj, "to", ref->addr);
 							pj_end (pj);
 						} else {
-							r_cons_printf ("%c 0x%08" PFMT64x " -> 0x%08" PFMT64x "\n",
-									ref->type, ref->at, ref->addr);
+							r_cons_printf ("%c 0x%08" PFMT64x " ", ref->type, ref->at);
+							switch (ref->type) {
+							case 'c':
+							case 'C':
+							case 'd':
+								r_cons_printf ("0x%08" PFMT64x " ", ref->addr);
+								r_core_cmdf (core, "pi 1 @ 0x%08"PFMT64x, ref->at);
+								break;
+							case 's':
+							//case 'd':
+								r_core_cmdf (core, "pxr 8 @ 0x%08"PFMT64x, ref->addr);
+								break;
+							}
 						}
 					}
 					r_list_free (refs);
@@ -7146,6 +7207,20 @@ static bool cmd_anal_refs(RCore *core, const char *input) {
 		r_list_free (list);
 		free (ptr);
 	} break;
+	case 'v': // "axv"
+		{
+		RList *list = r_anal_get_functions_in (core->anal, core->offset);
+		if (list) {
+			r_cons_printf ("afvR\n");
+			r_core_cmd0 (core, "afvR");
+			r_cons_printf ("afvW\n");
+			r_core_cmd0 (core, "afvW");
+			r_list_free (list);
+		} else {
+			eprintf ("Cannot find function in 0x%08"PFMT64x"\n", core->offset);
+		}
+		}
+		break;
 	case 't': { // "axt"
 		RList *list = NULL;
 		RAnalFunction *fcn;

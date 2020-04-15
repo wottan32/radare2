@@ -654,4 +654,16 @@ static inline void r_run_call10(void *fcn, void *arg1, void *arg2, void *arg3, v
 # endif
 #endif
 
+// reference counter
+typedef void (*RFreeCallback)(void *a);
+typedef struct r_ref_t {
+	volatile size_t count;
+	RFreeCallback free;
+} RRef;
+
+#define r_ref_new(x) RRef{0,x}
+#define r_ref_free(x) x->ref.free(x)
+#define r_ref(x) x->ref.count++;
+#define r_unref(x) if (x->ref.count>0) { x->ref.count--; if (!x->ref.count) x->ref.free(x); }
+
 #endif // R2_TYPES_H

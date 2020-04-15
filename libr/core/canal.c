@@ -5660,6 +5660,10 @@ R_API void r_core_anal_propagate_noreturn(RCore *core, ut64 addr) {
 				r_anal_fcn_del_locs (core->anal, addr);
 				// big depth results on infinite loops :( but this is a different issue
 				r_core_anal_fcn (core, addr, UT64_MAX, R_ANAL_REF_TYPE_NULL, 3);
+				RAnalFunction *fcn = r_anal_get_function_at (core->anal, addr);
+				if (fcn && core->anal->opt.vars) {
+					r_core_recover_vars (core, fcn, true);
+				}
 
 				f = r_anal_get_function_at (core->anal, addr);
 				if (!f || (f->type != R_ANAL_FCN_TYPE_FCN && f->type != R_ANAL_FCN_TYPE_SYM)) {

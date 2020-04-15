@@ -4036,7 +4036,7 @@ onemoretime:
 				if (bar) {
 					char *newname = r_cons_input (sdb_fmt ("New variable name for '%s': ", bar->name));
 					if (newname && *newname) {
-						r_anal_var_rename (core->anal, fcn->addr, bar->scope,
+						r_anal_var_rename (core->anal, fcn->addr, 1,
 								bar->kind, bar->name, newname, true);
 						free (newname);
 					}
@@ -4320,7 +4320,7 @@ onemoretime:
 				if (bar) {
 					char *newname = r_cons_input (sdb_fmt ("New variable name for '%s': ", bar->name));
 					if (newname && *newname) {
-						r_anal_var_rename (core->anal, fcn->addr, bar->scope,
+						r_anal_var_rename (core->anal, fcn->addr, 1,
 								bar->kind, bar->name, newname, true);
 						free (newname);
 					}

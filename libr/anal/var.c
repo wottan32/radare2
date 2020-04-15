@@ -214,6 +214,7 @@ R_API void r_anal_function_delete_all_vars_of_kind(RAnalFunction *fcn, RAnalVarK
 		if (var->kind == kind) {
 			r_pvector_remove_at (&fcn->vars, i);
 			r_anal_var_free (var);
+			continue;
 		}
 		i++;
 	}
